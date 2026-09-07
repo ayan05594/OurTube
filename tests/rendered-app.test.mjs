@@ -5,7 +5,7 @@ async function render(pathname = "/") {
   return fetchWorker(`https://ourtube.example${pathname}`);
 }
 
-async function fetchWorker(requestUrl) {
+async function fetchWorker(requestUrl, init = {}) {
   process.env.NEXT_PUBLIC_SITE_URL = "https://ourtube.example";
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${Math.random()}`);
@@ -14,11 +14,13 @@ async function fetchWorker(requestUrl) {
 
   return worker.fetch(
     new Request(requestUrl, {
+      ...init,
       headers: {
         accept: "text/html",
         host: origin.host,
         "x-forwarded-host": origin.host,
         "x-forwarded-proto": "https",
+        ...init.headers,
       },
     }),
     {
@@ -32,6 +34,28 @@ async function fetchWorker(requestUrl) {
     },
   );
 }
+
+test("Google sign-in form redirects to the OAuth start route", async () => {
+  const landing = await render();
+  const html = await landing.text();
+  const action = html.match(/name="(\$ACTION_ID_[^"]+)"/i)?.[1];
+  assert.ok(action, "missing rendered Google sign-in server action");
+
+  const formData = new FormData();
+  formData.set(action, "");
+  const response = await fetchWorker("https://ourtube.example/", {
+    method: "POST",
+    body: formData,
+  });
+
+  assert.equal(response.status, 303);
+  const location = response.headers.get("location");
+  assert.ok(location, "missing Google OAuth redirect location");
+  assert.equal(
+    new URL(location, "https://ourtube.example").href,
+    "https://ourtube.example/api/auth/google?next=%2Fconnect",
+  );
+});
 
 test("OAuth starts on the canonical host before setting PKCE cookies", async () => {
   const response = await fetchWorker(

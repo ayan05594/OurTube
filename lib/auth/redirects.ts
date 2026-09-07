@@ -28,7 +28,7 @@ export function pathWithQuery(
   pathname: string,
   values: Record<string, string | null | undefined>,
 ): string {
-  const url = new URL(safeRelativePath(pathname), FALLBACK_ORIGIN);
+  const url = new URL(normalizeFallback(pathname), FALLBACK_ORIGIN);
   Object.entries(values).forEach(([name, value]) => {
     if (value) url.searchParams.set(name, value);
   });

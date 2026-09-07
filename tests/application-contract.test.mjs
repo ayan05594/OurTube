@@ -113,7 +113,10 @@ test("keeps connected content behind typed authenticated server actions", async 
 });
 
 test("canonicalizes OAuth start before creating PKCE cookies", async () => {
-  const route = await read("app/api/auth/google/route.ts");
+  const [route, redirects] = await Promise.all([
+    read("app/api/auth/google/route.ts"),
+    read("lib/auth/redirects.ts"),
+  ]);
   const canonicalCheck = route.indexOf("request.nextUrl.origin !== siteOrigin");
   const routeClientCreation = route.indexOf("createRouteClient(request)");
 
@@ -125,6 +128,10 @@ test("canonicalizes OAuth start before creating PKCE cookies", async () => {
   assert.match(route, /new URL\(["']\/api\/auth\/google["'],\s*siteOrigin\)/);
   assert.match(route, /canonicalStart\.searchParams\.set\(["']next["'],\s*next\)/);
   assert.match(route, /NextResponse\.redirect\(canonicalStart,\s*307\)/);
+  assert.match(
+    redirects,
+    /new URL\(normalizeFallback\(pathname\),\s*FALLBACK_ORIGIN\)/,
+  );
 });
 
 test("guards landing auth readiness and canonicalizes callbacks before PKCE exchange", async () => {
