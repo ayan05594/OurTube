@@ -70,6 +70,66 @@ test("OAuth starts on the canonical host before setting PKCE cookies", async () 
   assert.equal(response.headers.get("set-cookie"), null);
 });
 
+for (const unsafeNext of [
+  "https://attacker.example/steal",
+  "//attacker.example/steal",
+  "/auth/callback",
+  "/api/auth/google",
+]) {
+  test(`root OAuth recovery rejects unsafe next destination: ${unsafeNext}`, async () => {
+    const url = new URL("https://unexpected.example/");
+    url.searchParams.set("code", "test-code");
+    url.searchParams.set("next", unsafeNext);
+    const response = await fetchWorker(url.href);
+
+    assert.equal(response.status, 307);
+    assert.equal(
+      response.headers.get("location"),
+      "https://ourtube.example/auth/callback?code=test-code&next=%2Fconnect",
+    );
+  });
+}
+
+test("root OAuth recovery fails closed for duplicate codes", async () => {
+  const response = await fetchWorker(
+    "https://unexpected.example/?code=first&code=second",
+  );
+
+  assert.equal(response.status, 302);
+  assert.equal(
+    response.headers.get("location"),
+    "https://ourtube.example/?authError=oauth_callback_failed",
+  );
+  assert.doesNotMatch(response.headers.get("location") ?? "", /first|second/);
+});
+
+for (const malformedCode of ["", "x".repeat(4097)]) {
+  test(`root OAuth recovery fails closed for a ${malformedCode ? "long" : "blank"} code`, async () => {
+    const url = new URL("https://unexpected.example/");
+    url.searchParams.set("code", malformedCode);
+    const response = await fetchWorker(url.href);
+
+    assert.equal(response.status, 302);
+    assert.equal(
+      response.headers.get("location"),
+      "https://ourtube.example/?authError=oauth_callback_failed",
+    );
+  });
+}
+
+test("root OAuth recovery does not redirect POST requests", async () => {
+  const response = await fetchWorker(
+    "https://unexpected.example/?code=test-code",
+    { method: "POST" },
+  );
+
+  assert.notEqual(response.status, 307);
+  assert.notEqual(
+    response.headers.get("location"),
+    "https://ourtube.example/auth/callback?code=test-code&next=%2Fconnect",
+  );
+});
+
 test("OAuth callback moves to the canonical host before PKCE exchange", async () => {
   const response = await fetchWorker(
     "https://unexpected.example/auth/callback?code=test-code&next=%2Four-space",
@@ -81,6 +141,23 @@ test("OAuth callback moves to the canonical host before PKCE exchange", async ()
     "https://ourtube.example/auth/callback?code=test-code&next=%2Four-space",
   );
   assert.equal(response.headers.get("set-cookie"), null);
+  assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+});
+
+test("OAuth code sent to the root recovers on the canonical callback", async () => {
+  const response = await fetchWorker(
+    "https://unexpected.example/?code=test-code&next=%2Four-space",
+  );
+
+  assert.equal(response.status, 307);
+  assert.equal(
+    response.headers.get("location"),
+    "https://ourtube.example/auth/callback?code=test-code&next=%2Four-space",
+  );
+  assert.equal(response.headers.get("set-cookie"), null);
+  assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
 });
 
 test("server-renders the finished OurTube landing experience safely without secrets", async () => {

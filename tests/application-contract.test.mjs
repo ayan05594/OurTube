@@ -135,10 +135,11 @@ test("canonicalizes OAuth start before creating PKCE cookies", async () => {
 });
 
 test("guards landing auth readiness and canonicalizes callbacks before PKCE exchange", async () => {
-  const [page, button, callback] = await Promise.all([
+  const [page, button, callback, proxy] = await Promise.all([
     read("app/page.tsx"),
     read("app/components/google-sign-in-button.tsx"),
     read("app/auth/callback/route.ts"),
+    read("proxy.ts"),
   ]);
 
   assert.match(page, /isSupabaseConfigured\(\)/);
@@ -155,6 +156,16 @@ test("guards landing auth readiness and canonicalizes callbacks before PKCE exch
   assert.match(callback, /new URL\(["']\/auth\/callback["'],\s*siteOrigin\)/);
   assert.match(callback, /canonicalCallback\.searchParams\.set\(["']next["'],\s*next\)/);
   assert.match(callback, /NextResponse\.redirect\(canonicalCallback,\s*307\)/);
+
+  const recovery = proxy.indexOf("recoverRootOAuthCode(request)");
+  const sessionUpdate = proxy.indexOf("updateSession(request)");
+  assert.ok(recovery >= 0, "missing root OAuth-code recovery");
+  assert.ok(recovery < sessionUpdate, "OAuth recovery must run before session middleware");
+  assert.match(proxy, /request\.method\s*!==\s*["']GET["']/);
+  assert.match(proxy, /request\.nextUrl\.pathname\s*!==\s*["']\/["']/);
+  assert.match(proxy, /codes\.length\s*!==\s*1/);
+  assert.match(proxy, /code\.length\s*>\s*4096/);
+  assert.match(proxy, /safeRelativePath\(request\.nextUrl\.searchParams\.get\(["']next["']\),\s*["']\/connect["']\)/);
 });
 
 test("removes the disposable starter preview from the finished product", async () => {
