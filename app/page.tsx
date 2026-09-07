@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signInWithGoogle } from "@/app/actions/auth";
+import { getSiteOrigin } from "@/lib/auth/origin";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getCurrentConnection } from "@/lib/connections/queries";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -15,8 +16,10 @@ export const dynamic = "force-dynamic";
 
 export default async function Home({ searchParams }: HomeProps) {
   const params = (await searchParams) ?? {};
-  const configured = isSupabaseConfigured();
-  const viewer = configured ? await getCurrentUser() : null;
+  const supabaseConfigured = isSupabaseConfigured();
+  const siteConfigured = getSiteOrigin() !== null;
+  const authenticationConfigured = supabaseConfigured && siteConfigured;
+  const viewer = supabaseConfigured ? await getCurrentUser() : null;
 
   if (viewer) {
     const connection = await getCurrentConnection();
@@ -24,8 +27,10 @@ export default async function Home({ searchParams }: HomeProps) {
   }
 
   const authError = Array.isArray(params.authError) ? params.authError[0] : params.authError;
-  const authMessage = !configured
+  const authMessage = !supabaseConfigured || authError === "supabase_not_configured"
     ? "Our private sign-in is not configured yet. Add the Supabase public settings to continue."
+    : !siteConfigured || authError === "site_url_not_configured"
+      ? "Google sign-in needs a valid canonical site URL before it can continue."
     : authError
       ? "We couldn’t complete Google sign-in. Please try once more."
       : null;
@@ -43,7 +48,7 @@ export default async function Home({ searchParams }: HomeProps) {
           <div className="landing-eyebrow"><span className="eyebrow-avatars" aria-hidden="true"><i>A</i><i>M</i></span>One private space, together</div>
           <h1>The videos you love,<em> kept between you two.</em></h1>
           <p className="landing-lede">Share YouTube videos, swap Shorts, and talk about every little thing — in a warm, private space made for you and your person.</p>
-          <form action={signInWithGoogle} className="sign-in-form"><GoogleSignInButton /></form>
+          <form action={signInWithGoogle} className="sign-in-form"><GoogleSignInButton disabled={!authenticationConfigured} /></form>
           {authMessage && <p className="landing-alert" role="alert">{authMessage}</p>}
           <p className="sign-in-note"><span aria-hidden="true">●</span>Your space is invitation-only. No public profiles, ever.</p>
           <div className="landing-proof" aria-label="OurTube qualities">

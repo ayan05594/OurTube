@@ -18,6 +18,12 @@ export async function GET(request: NextRequest) {
   try {
     siteOrigin = requireSiteOrigin(request.nextUrl.origin);
     if (!code || code.length > 4096) return callbackFailure(siteOrigin);
+    if (request.nextUrl.origin !== siteOrigin) {
+      const canonicalCallback = new URL("/auth/callback", siteOrigin);
+      canonicalCallback.searchParams.set("code", code);
+      canonicalCallback.searchParams.set("next", next);
+      return noStore(NextResponse.redirect(canonicalCallback, 307));
+    }
 
     const { supabase, applyTo } = createRouteClient(request);
     const { error } = await supabase.auth.exchangeCodeForSession(code);

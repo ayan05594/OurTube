@@ -127,6 +127,29 @@ test("canonicalizes OAuth start before creating PKCE cookies", async () => {
   assert.match(route, /NextResponse\.redirect\(canonicalStart,\s*307\)/);
 });
 
+test("guards landing auth readiness and canonicalizes callbacks before PKCE exchange", async () => {
+  const [page, button, callback] = await Promise.all([
+    read("app/page.tsx"),
+    read("app/components/google-sign-in-button.tsx"),
+    read("app/auth/callback/route.ts"),
+  ]);
+
+  assert.match(page, /isSupabaseConfigured\(\)/);
+  assert.match(page, /getSiteOrigin\(\)\s*!==\s*null/);
+  assert.match(page, /disabled={!authenticationConfigured}/);
+  assert.match(button, /disabled={disabled \|\| pending}/);
+
+  const canonicalCheck = callback.indexOf("request.nextUrl.origin !== siteOrigin");
+  const routeClientCreation = callback.indexOf("createRouteClient(request)");
+  const exchange = callback.indexOf("exchangeCodeForSession(code)");
+  assert.ok(canonicalCheck >= 0, "missing callback canonical-origin check");
+  assert.ok(canonicalCheck < routeClientCreation);
+  assert.ok(canonicalCheck < exchange);
+  assert.match(callback, /new URL\(["']\/auth\/callback["'],\s*siteOrigin\)/);
+  assert.match(callback, /canonicalCallback\.searchParams\.set\(["']next["'],\s*next\)/);
+  assert.match(callback, /NextResponse\.redirect\(canonicalCallback,\s*307\)/);
+});
+
 test("removes the disposable starter preview from the finished product", async () => {
   const [page, layout, packageJson] = await Promise.all([
     read("app/page.tsx"),

@@ -46,6 +46,19 @@ test("OAuth starts on the canonical host before setting PKCE cookies", async () 
   assert.equal(response.headers.get("set-cookie"), null);
 });
 
+test("OAuth callback moves to the canonical host before PKCE exchange", async () => {
+  const response = await fetchWorker(
+    "https://unexpected.example/auth/callback?code=test-code&next=%2Four-space",
+  );
+
+  assert.equal(response.status, 307);
+  assert.equal(
+    response.headers.get("location"),
+    "https://ourtube.example/auth/callback?code=test-code&next=%2Four-space",
+  );
+  assert.equal(response.headers.get("set-cookie"), null);
+});
+
 test("server-renders the finished OurTube landing experience safely without secrets", async () => {
   const response = await render();
   assert.equal(response.status, 200);
