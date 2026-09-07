@@ -57,7 +57,7 @@ function withSecurityHeaders(response: Response): Response {
       "font-src 'self' data:",
       "form-action 'self'",
       "frame-ancestors 'none'",
-      "frame-src 'none'",
+      "frame-src https://www.youtube-nocookie.com",
       "img-src 'self' data: https:",
       "media-src 'none'",
       "object-src 'none'",
@@ -67,7 +67,9 @@ function withSecurityHeaders(response: Response): Response {
     ].join("; "),
   );
   headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
-  headers.set("Referrer-Policy", "no-referrer");
+  if (!headers.has("Referrer-Policy")) {
+    headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  }
   headers.set("Strict-Transport-Security", "max-age=31536000");
   headers.set("X-DNS-Prefetch-Control", "off");
   headers.set("X-Content-Type-Options", "nosniff");

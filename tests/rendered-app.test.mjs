@@ -68,6 +68,7 @@ test("OAuth starts on the canonical host before setting PKCE cookies", async () 
     "https://ourtube.example/api/auth/google?next=%2Four-space",
   );
   assert.equal(response.headers.get("set-cookie"), null);
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
 });
 
 for (const unsafeNext of [
@@ -166,13 +167,20 @@ test("server-renders the finished OurTube landing experience safely without secr
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("x-frame-options"), "DENY");
-  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(
+    response.headers.get("referrer-policy"),
+    "strict-origin-when-cross-origin",
+  );
   assert.equal(
     response.headers.get("strict-transport-security"),
     "max-age=31536000",
   );
   assert.match(response.headers.get("content-security-policy") ?? "", /default-src 'self'/);
   assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
+  assert.match(
+    response.headers.get("content-security-policy") ?? "",
+    /frame-src https:\/\/www\.youtube-nocookie\.com/,
+  );
   assert.match(response.headers.get("content-security-policy") ?? "", /connect-src 'self' https: wss:/);
   assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\)/);
 

@@ -58,6 +58,37 @@ set code_ttl = interval '24 hours'
 where singleton;
 ```
 
+## Configure in-app YouTube search
+
+OurTube reuses the Google OAuth connection supplied through Supabase. Configure
+YouTube in the same Google Cloud project and OAuth client already used for
+Google sign-in:
+
+1. Open **Google Cloud > APIs & Services > Library**, find **YouTube Data API
+   v3**, and enable it for the project.
+2. Open **Google Auth Platform > Data Access > Add or remove scopes** and add
+   `https://www.googleapis.com/auth/youtube.readonly`.
+3. Under **Google Auth Platform > Audience**, keep the app in **Testing** while
+   it is a private two-person deployment and add both Google accounts under
+   **Test users**.
+4. Keep the existing Supabase Google provider client ID and secret. The Google
+   authorized redirect URI remains
+   `https://<project-ref>.supabase.co/auth/v1/callback`; adding YouTube search
+   does not change the callback.
+5. After enabling the API and scope, open the in-app picker and select **Connect
+   YouTube** so Google can show the dedicated permission request. The provider
+   access grant is short-lived; if it expires, OurTube asks the user to connect
+   YouTube again.
+
+No YouTube API key or additional Vercel environment variable is required. Search
+uses the signed-in user's short-lived provider OAuth token, which remains in a
+secure, HTTP-only cookie rather than the database or client-side JavaScript.
+
+The full `youtube.com` website cannot be embedded as an in-app browser because
+YouTube blocks that framing. OurTube instead uses the YouTube Data API for its
+in-app picker and loads the privacy-enhanced YouTube player only after a shared
+video is selected for playback.
+
 Content mutations are also database-limited so direct RPC clients cannot bypass
 the UI and amplify writes through Realtime. Defaults are 30 messages, 60
 reactions, and 20 favorite operations per person per minute, with pair-wide

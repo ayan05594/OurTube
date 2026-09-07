@@ -7,7 +7,7 @@ const contentSecurityPolicy = [
   "font-src 'self' data:",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "frame-src 'none'",
+  "frame-src https://www.youtube-nocookie.com",
   "img-src 'self' data: https:",
   "media-src 'none'",
   "object-src 'none'",
@@ -30,7 +30,10 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), geolocation=(), microphone=()",
           },
-          { key: "Referrer-Policy", value: "no-referrer" },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
           {
             key: "Strict-Transport-Security",
             value: "max-age=31536000",

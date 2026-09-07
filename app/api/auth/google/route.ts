@@ -69,5 +69,6 @@ function noStore<T extends NextResponse>(response: T): T {
     "Cache-Control",
     "private, no-cache, no-store, must-revalidate, max-age=0",
   );
+  response.headers.set("Referrer-Policy", "no-referrer");
   return response;
 }

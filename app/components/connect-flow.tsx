@@ -446,6 +446,8 @@ export function ConnectFlow({ initialConnection }: ConnectFlowProps) {
         <span>Private by design</span>
         <span aria-hidden="true">·</span>
         <Link href="/privacy">Your privacy</Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/terms">Terms</Link>
       </footer>
     </main>
   );

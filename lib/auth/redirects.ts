@@ -1,6 +1,7 @@
 const FALLBACK_ORIGIN = "https://ourtube.invalid";
 const RESERVED_AUTH_PATHS = new Set([
   "/api/auth/google",
+  "/api/auth/youtube",
   "/auth/callback",
 ]);
 

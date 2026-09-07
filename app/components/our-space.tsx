@@ -17,6 +17,8 @@ import type { ConnectedContent, OurTubeMessage, SharedVideo } from "@/lib/conten
 import { subscribeToContentChanges } from "@/lib/content/realtime";
 import { Brand } from "./brand";
 import { UserAvatar } from "./user-avatar";
+import { YouTubeEmbed } from "./youtube-embed";
+import { YouTubePicker, type YouTubePickerSelection } from "./youtube-picker";
 
 type SpaceTab = "videos" | "shorts" | "chat";
 type ShareKind = "video" | "short" | null;
@@ -24,6 +26,8 @@ type ShareKind = "video" | "short" | null;
 type OurSpaceProps = {
   connection: ConnectedViewer;
   initialContent: ConnectedContent;
+  initialPicker?: Exclude<ShareKind, null> | null;
+  initialYouTubeError?: string | null;
 };
 
 const navItems: Array<{ id: SpaceTab; label: string; mobileLabel: string; symbol: string }> = [
@@ -52,12 +56,18 @@ function messageTitle(message: OurTubeMessage | undefined, video: SharedVideo) {
     (video.type === "short" ? "A Short shared with you" : "A video shared with you");
 }
 
-export function OurSpace({ connection, initialContent }: OurSpaceProps) {
+export function OurSpace({
+  connection,
+  initialContent,
+  initialPicker = null,
+  initialYouTubeError = null,
+}: OurSpaceProps) {
   const router = useRouter();
   const { viewer, partner, connectedAt } = connection;
-  const [activeTab, setActiveTab] = useState<SpaceTab>("videos");
+  const [activeTab, setActiveTab] = useState<SpaceTab>(initialPicker === "short" ? "shorts" : "videos");
   const [content, setContent] = useState(initialContent);
-  const [shareKind, setShareKind] = useState<ShareKind>(null);
+  const [shareKind, setShareKind] = useState<ShareKind>(initialPicker);
+  const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const leavingSpace = useRef(false);
@@ -82,6 +92,7 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
       subscribeToConnectionChanges((latestConnection) => {
         if (latestConnection.status === "CONNECTED" || leavingSpace.current) return;
         leavingSpace.current = true;
+        setActivePlayerId(null);
         setContent({ messages: [], sharedVideos: [], favorites: [] });
         router.replace("/connect");
         router.refresh();
@@ -106,10 +117,12 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
     });
   }
 
-  function addMedia(event: FormEvent<HTMLFormElement>, kind: "video" | "short") {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    runMutation(() => (kind === "video" ? shareVideo(form) : shareShort(form)));
+  function shareSelectedMedia(selection: YouTubePickerSelection, kind: "video" | "short") {
+    runMutation(() =>
+      kind === "video"
+        ? shareVideo({ youtubeUrl: selection.youtubeUrl, title: selection.title })
+        : shareShort({ youtubeUrl: selection.youtubeUrl, title: selection.title }),
+    );
   }
 
   function sendMessage(event: FormEvent<HTMLFormElement>) {
@@ -139,6 +152,17 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
     runMutation(() => toggleMessageReaction({ messageId, emoji: "❤️" }));
   }
 
+  function selectTab(tab: SpaceTab) {
+    setActivePlayerId(null);
+    setShareKind(null);
+    setActiveTab(tab);
+  }
+
+  function togglePicker(kind: Exclude<ShareKind, null>) {
+    setActivePlayerId(null);
+    setShareKind((current) => current === kind ? null : kind);
+  }
+
   return (
     <main className="space-page">
       <header className="space-topbar">
@@ -156,7 +180,7 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
           </div>
           <nav className="space-nav">
             {navItems.map((item) => (
-              <button key={item.id} className={activeTab === item.id ? "is-active" : undefined} type="button" onClick={() => setActiveTab(item.id)} aria-current={activeTab === item.id ? "page" : undefined} aria-controls={`${panelId}-${item.id}`}>
+              <button key={item.id} className={activeTab === item.id ? "is-active" : undefined} type="button" onClick={() => selectTab(item.id)} aria-current={activeTab === item.id ? "page" : undefined} aria-controls={`${panelId}-${item.id}`}>
                 <span className={`nav-symbol nav-symbol--${item.id}`} aria-hidden="true">{item.symbol}</span>{item.label}
               </button>
             ))}
@@ -168,13 +192,19 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
             <div id={`${panelId}-videos`} role="tabpanel" className="tab-panel">
               <div className="content-heading">
                 <div><p className="eyebrow">Your shared queue</p><h1>Good evening, {firstName}.</h1><p>A little corner for everything you want to watch together.</p></div>
-                <button className="primary-button primary-button--small" type="button" onClick={() => setShareKind(shareKind === "video" ? null : "video")} aria-expanded={shareKind === "video"} aria-controls="share-video-panel"><span aria-hidden="true">＋</span>Share a video</button>
+                <button className="primary-button primary-button--small" type="button" onClick={() => togglePicker("video")} aria-expanded={shareKind === "video"} aria-controls="share-video-panel"><span aria-hidden="true">＋</span>Find on YouTube</button>
               </div>
               {shareKind === "video" && (
-                <form className="share-composer" id="share-video-panel" onSubmit={(event) => addMedia(event, "video")}>
-                  <div><label htmlFor="youtube-url">Paste a YouTube link</label><p>It will appear here for {partnerFirstName}.</p></div>
-                  <div className="share-composer__fields"><input id="youtube-url" name="youtubeUrl" type="url" inputMode="url" placeholder="https://youtube.com/watch?v=…" required /><button className="primary-button primary-button--small" type="submit" disabled={isPending}>Add to our space</button></div>
-                </form>
+                <div className="share-composer" id="share-video-panel">
+                  <YouTubePicker
+                    disabled={isPending}
+                    initialOAuthError={initialPicker === "video" ? initialYouTubeError : null}
+                    kind="video"
+                    onShare={(selection) => shareSelectedMedia(selection, "video")}
+                    partnerName={partnerFirstName}
+                    viewerEmail={viewer.email}
+                  />
+                </div>
               )}
               {error && <p className="form-error" role="alert">{error}</p>}
               {videos.length > 0 ? (
@@ -188,11 +218,20 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
                       const title = messageTitle(message, video);
                       return (
                         <article className="video-card" key={video.messageId}>
-                          <a className={`video-poster video-poster--${palettes[index % palettes.length]}`} href={video.youtubeUrl} target="_blank" rel="noreferrer" aria-label={`Watch ${title} on YouTube`}>
-                            <span className="poster-kicker">{index === 0 ? "Latest for us" : "YouTube"}</span><span className="poster-shape" aria-hidden="true" /><span className="poster-play" aria-hidden="true">▶</span><span className="poster-duration">Watch</span>
-                          </a>
+                          <YouTubeEmbed
+                            active={activePlayerId === video.messageId}
+                            badge={index === 0 ? "Latest for us" : "YouTube"}
+                            className={`video-poster--${palettes[index % palettes.length]}`}
+                            onPlay={() => {
+                              setShareKind(null);
+                              setActivePlayerId(video.messageId);
+                            }}
+                            title={title}
+                            variant="video"
+                            videoId={video.youtubeVideoId}
+                          />
                           <div className="video-card__body">
-                            <div><p className="video-source">Shared {formatWhen(video.sharedAt)}</p><h3>{title}</h3></div>
+                            <div><p className="video-source">Shared {formatWhen(video.sharedAt)}</p><h3><a href={video.youtubeUrl} target="_blank" rel="noopener noreferrer">{title}<span className="sr-only"> (open on YouTube)</span></a></h3></div>
                             <details className="favorite-menu">
                               <summary className={`love-button${viewerFavorite || partnerFavorite ? " is-loved" : ""}`} aria-label={viewerFavorite ? `Saved ${viewerFavorite.visibility}` : partnerFavorite ? "Your partner shared this favorite" : "Choose how to save this video"}><span aria-hidden="true">♥</span></summary>
                               <div>
@@ -212,7 +251,7 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
                   </div>
                 </>
               ) : (
-                <div className="empty-state"><div><span className="empty-state__icon" aria-hidden="true">▶</span><h2>Your first watch starts here.</h2><p>Share a YouTube link and it will stay in one quiet queue for you and {partnerFirstName}.</p><button className="primary-button primary-button--small empty-state__button" type="button" onClick={() => setShareKind("video")}>Share our first video</button></div></div>
+                <div className="empty-state"><div><span className="empty-state__icon" aria-hidden="true">▶</span><h2>Your first watch starts here.</h2><p>Browse YouTube here and add something to one quiet queue for you and {partnerFirstName}.</p><button className="primary-button primary-button--small empty-state__button" type="button" onClick={() => togglePicker("video")}>Browse YouTube</button></div></div>
               )}
             </div>
           )}
@@ -220,13 +259,19 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
             <div id={`${panelId}-shorts`} role="tabpanel" className="tab-panel">
               <div className="content-heading">
                 <div><p className="eyebrow">Quick little finds</p><h1>Shorts for us.</h1><p>Tiny videos that were too good not to send.</p></div>
-                <button className="primary-button primary-button--small" type="button" onClick={() => setShareKind(shareKind === "short" ? null : "short")} aria-expanded={shareKind === "short"} aria-controls="share-short-panel"><span aria-hidden="true">＋</span>Share a Short</button>
+                <button className="primary-button primary-button--small" type="button" onClick={() => togglePicker("short")} aria-expanded={shareKind === "short"} aria-controls="share-short-panel"><span aria-hidden="true">＋</span>Find on YouTube</button>
               </div>
               {shareKind === "short" && (
-                <form className="share-composer" id="share-short-panel" onSubmit={(event) => addMedia(event, "short")}>
-                  <div><label htmlFor="short-url">Paste a YouTube Shorts link</label><p>A quick find for {partnerFirstName}.</p></div>
-                  <div className="share-composer__fields"><input id="short-url" name="youtubeUrl" type="url" inputMode="url" placeholder="https://youtube.com/shorts/…" required /><button className="primary-button primary-button--small" type="submit" disabled={isPending}>Share this Short</button></div>
-                </form>
+                <div className="share-composer" id="share-short-panel">
+                  <YouTubePicker
+                    disabled={isPending}
+                    initialOAuthError={initialPicker === "short" ? initialYouTubeError : null}
+                    kind="short"
+                    onShare={(selection) => shareSelectedMedia(selection, "short")}
+                    partnerName={partnerFirstName}
+                    viewerEmail={viewer.email}
+                  />
+                </div>
               )}
               {error && <p className="form-error" role="alert">{error}</p>}
               {shorts.length > 0 ? (
@@ -238,9 +283,19 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
                     const partnerFavorite = content.favorites.find((item) => item.youtubeUrl === short.youtubeUrl && !item.createdByViewer && item.visibility === "shared");
                     return (
                       <article className={`short-card short-card--${shortPalettes[index % shortPalettes.length]}`} key={short.messageId}>
-                        <a href={short.youtubeUrl} target="_blank" rel="noreferrer" aria-label={`Watch ${title} on YouTube`}><span className="short-card__index">{String(index + 1).padStart(2, "0")}</span><span className="short-card__play" aria-hidden="true">▶</span><span className="short-card__duration">Watch</span></a>
+                        <YouTubeEmbed
+                          active={activePlayerId === short.messageId}
+                          badge={String(index + 1).padStart(2, "0")}
+                          onPlay={() => {
+                            setShareKind(null);
+                            setActivePlayerId(short.messageId);
+                          }}
+                          title={title}
+                          variant="short"
+                          videoId={short.youtubeVideoId}
+                        />
                         <div className="short-card__body">
-                          <div><h2>{title}</h2><p>Shared by {short.sharedByViewer ? "you" : partnerFirstName} · {formatWhen(short.sharedAt)}</p></div>
+                          <div><h2><a href={short.youtubeUrl} target="_blank" rel="noopener noreferrer">{title}<span className="sr-only"> (open on YouTube)</span></a></h2><p>Shared by {short.sharedByViewer ? "you" : partnerFirstName} · {formatWhen(short.sharedAt)}</p></div>
                           <details className="favorite-menu favorite-menu--short">
                             <summary className={`love-button${viewerFavorite || partnerFavorite ? " is-loved" : ""}`} aria-label={viewerFavorite ? `Saved ${viewerFavorite.visibility}` : partnerFavorite ? "Your partner shared this favorite" : "Choose how to save this Short"}><span aria-hidden="true">♥</span></summary>
                             <div>
@@ -257,7 +312,7 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
                   })}
                 </div>
               ) : (
-                <div className="empty-state"><div><span className="empty-state__icon" aria-hidden="true">▯</span><h2>No Shorts here yet.</h2><p>When one makes you laugh, wonder, or think of {partnerFirstName}, give it a home here.</p><button className="primary-button primary-button--small empty-state__button" type="button" onClick={() => setShareKind("short")}>Share our first Short</button></div></div>
+                <div className="empty-state"><div><span className="empty-state__icon" aria-hidden="true">▯</span><h2>No Shorts here yet.</h2><p>Browse YouTube for something that makes you laugh, wonder, or think of {partnerFirstName}.</p><button className="primary-button primary-button--small empty-state__button" type="button" onClick={() => togglePicker("short")}>Browse YouTube Shorts</button></div></div>
               )}
             </div>
           )}
@@ -297,7 +352,7 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
               </div>
               {error && <p className="chat-error form-error" role="alert">{error}</p>}
               <form className="message-composer" onSubmit={sendMessage}>
-                <button type="button" onClick={() => { setActiveTab("videos"); setShareKind("video"); }} aria-label="Share a video"><span aria-hidden="true">＋</span></button>
+                <button type="button" onClick={() => { selectTab("videos"); setShareKind("video"); }} aria-label="Find a video on YouTube"><span aria-hidden="true">＋</span></button>
                 <label className="sr-only" htmlFor="chat-message">Message {partner.name}</label>
                 <input id="chat-message" name="message" type="text" autoComplete="off" placeholder={`Message ${partnerFirstName}…`} disabled={isPending} />
                 <button className="send-button" type="submit" aria-label="Send message" disabled={isPending}><span aria-hidden="true">↑</span></button>
@@ -308,7 +363,7 @@ export function OurSpace({ connection, initialContent }: OurSpaceProps) {
       </div>
       <nav className="mobile-tabbar" aria-label="Shared space navigation">
         {navItems.map((item) => (
-          <button key={item.id} className={activeTab === item.id ? "is-active" : undefined} type="button" onClick={() => setActiveTab(item.id)} aria-current={activeTab === item.id ? "page" : undefined}>
+          <button key={item.id} className={activeTab === item.id ? "is-active" : undefined} type="button" onClick={() => selectTab(item.id)} aria-current={activeTab === item.id ? "page" : undefined}>
             <span className={`nav-symbol nav-symbol--${item.id}`} aria-hidden="true">{item.symbol}</span><span>{item.mobileLabel}</span>
           </button>
         ))}

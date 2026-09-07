@@ -75,7 +75,7 @@ export default async function Home({ searchParams }: HomeProps) {
           <div className="floating-note floating-note--reaction" aria-hidden="true"><span>♥</span><p><strong>New reaction</strong><small>“This is so us”</small></p></div>
         </div>
       </section>
-      <footer className="landing-footer"><p>OurTube <span aria-hidden="true">♥</span> a quieter place to share</p><nav aria-label="Footer"><Link href="/privacy">Privacy</Link></nav></footer>
+      <footer className="landing-footer"><p>OurTube <span aria-hidden="true">♥</span> a quieter place to share</p><nav aria-label="Footer"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></nav></footer>
     </main>
   );
 }

@@ -35,6 +35,10 @@ function recoverRootOAuthCode(request: NextRequest): NextResponse | null {
     "next",
     safeRelativePath(request.nextUrl.searchParams.get("next"), "/connect"),
   );
+  const youtubeMarkers = request.nextUrl.searchParams.getAll("youtube");
+  if (youtubeMarkers.length === 1 && youtubeMarkers[0] === "1") {
+    callback.searchParams.set("youtube", "1");
+  }
   return noStoreRedirect(callback, 307);
 }
 

@@ -1,10 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { pathWithQuery, safeRelativePath } from "@/lib/auth/redirects";
 import { createClient } from "@/lib/supabase/server";
+import {
+  YOUTUBE_ACCESS_COOKIE,
+  YOUTUBE_OWNER_COOKIE,
+  YOUTUBE_PENDING_COOKIE,
+  youtubeAccessCookieOptions,
+  youtubePendingCookieOptions,
+} from "@/lib/youtube/auth";
 
 export async function signInWithGoogle(formData?: FormData): Promise<never> {
   const next = safeRelativePath(readString(formData?.get("next")), "/connect");
@@ -25,6 +33,11 @@ export async function signOut(formData?: FormData): Promise<never> {
   } catch {
     failed = true;
   }
+
+  const cookieStore = await cookies();
+  cookieStore.set(YOUTUBE_ACCESS_COOKIE, "", youtubeAccessCookieOptions(0));
+  cookieStore.set(YOUTUBE_OWNER_COOKIE, "", youtubeAccessCookieOptions(0));
+  cookieStore.set(YOUTUBE_PENDING_COOKIE, "", youtubePendingCookieOptions(0));
 
   if (failed) redirect(pathWithQuery(next, { authError: "signout_failed" }));
   revalidatePath("/", "layout");
