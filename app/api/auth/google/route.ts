@@ -8,7 +8,6 @@ import { pathWithQuery, safeRelativePath } from "@/lib/auth/redirects";
 import { SupabaseConfigurationError } from "@/lib/supabase/config";
 import { createRouteClient } from "@/lib/supabase/route";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {

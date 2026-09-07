@@ -4,7 +4,6 @@ import { requireSiteOrigin } from "@/lib/auth/origin";
 import { pathWithQuery, safeRelativePath } from "@/lib/auth/redirects";
 import { createRouteClient } from "@/lib/supabase/route";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {

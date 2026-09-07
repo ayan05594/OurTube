@@ -4,7 +4,6 @@ import { getCurrentConnection } from "@/lib/connections/queries";
 import { statusForError, toActionError } from "@/lib/connections/errors";
 import type { ActionResult, CurrentConnection } from "@/lib/connections/types";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 export async function GET() {

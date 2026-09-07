@@ -22,7 +22,8 @@ shared space.
 
 ## Stack
 
-- Next.js-compatible React application built with vinext for Cloudflare Workers
+- Native Next.js deployment for Vercel
+- Optional vinext build for Cloudflare Workers and Sites
 - Supabase Auth, Postgres, Row Level Security, RPC, and Realtime Broadcast
 - TypeScript and plain responsive CSS
 
@@ -83,9 +84,15 @@ npm run db:check
 npm test
 ```
 
-`npm test` builds the Worker bundle and runs source, security-contract, and
-rendered-response tests. Applying the SQL to a Supabase staging project is still
-required before exercising the authenticated end-to-end flow.
+`npm test` validates both the native Next.js and Worker builds, then runs
+source, security-contract, and rendered-response tests. Applying the SQL to a
+Supabase staging project is still required before exercising the authenticated
+end-to-end flow.
+
+For Vercel, keep the Framework Preset set to **Next.js**, use the repository's
+default `npm run build`, and leave Output Directory unset so Vercel reads the
+standard `.next` output. The Cloudflare/Sites build remains available as
+`npm run build:sites`.
 
 ## Production checklist
 

@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.13.0"
+    "node": "22.x"
   },
   "scripts": {
-    "dev": "vinext dev",
-    "build": "vinext build",
-    "start": "vinext start",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "dev:sites": "vinext dev",
+    "build:sites": "vinext build",
+    "start:sites": "vinext start",
+    "test": "npm run build && npm run build:sites && node --test tests/*.test.mjs",
     "test:source": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
